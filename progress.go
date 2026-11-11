@@ -3,6 +3,7 @@ package transit
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 )
@@ -21,13 +22,14 @@ func (p *ProgressListener) OnObjectBytesTransferred(ctx context.Context, event *
 
 	if total > 0 {
 		percent := float64(transferred) / float64(total) * 100
-		fmt.Printf("Progress: %s / %s , (%.1f%%)", humanBytes(uint64(transferred)), humanBytes(uint64(total)), percent)
+		fmt.Printf("\rProgress: %s / %s , (%.1f%%)", humanBytes(uint64(transferred)), humanBytes(uint64(total)), percent)
 
 	} else {
 		// unknown size
-		fmt.Printf("Progress: %s", humanBytes(uint64(transferred)))
-
+		fmt.Printf("\rProgress: %s", humanBytes(uint64(transferred)))
 	}
+
+	os.Stdout.Sync()
 }
 
 func (p *ProgressListener) OnObjectTransferComplete(_ context.Context, event *transfermanager.ObjectTransferCompleteEvent) {
@@ -37,17 +39,4 @@ func (p *ProgressListener) OnObjectTransferComplete(_ context.Context, event *tr
 // retry?
 func (p *ProgressListener) OnObjectTransferFailed(_ context.Context, event *transfermanager.ObjectTransferFailedEvent) {
 	fmt.Printf("Transit failed: %v\n", event.Error.Error())
-}
-
-func humanBytes(b uint64) string {
-	const unit = 1000
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := uint64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }

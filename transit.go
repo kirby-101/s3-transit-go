@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 )
 
-// 301?
+// 301?, User-Agent
 func (t *TransitManager) downloadFromURL(url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(
 		t.ctx,
@@ -21,6 +21,8 @@ func (t *TransitManager) downloadFromURL(url string) (*http.Response, error) {
 		return nil, err
 	}
 
+	setDefaultHTTPHeaders(req)
+
 	// Request
 	resp, err := t.httpclient.Do(req)
 	if err != nil {
@@ -30,7 +32,7 @@ func (t *TransitManager) downloadFromURL(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (t *TransitManager) uploadToS3(bucket, filePath, contentType string, contentLenght int64, src io.ReadCloser) error {
+func (t *TransitManager) uploadToS3(bucket, filePath, contentType string, contentLength int64, src io.ReadCloser) error {
 	var (
 		uploadmanager = transfermanager.New(
 			t.s3client,
@@ -47,8 +49,8 @@ func (t *TransitManager) uploadToS3(bucket, filePath, contentType string, conten
 	)
 
 	// Set Content-Lenght if available
-	if contentLenght != 0 {
-		uploadargs.ContentLength = aws.Int64(contentLenght)
+	if contentLength != 0 {
+		uploadargs.ContentLength = aws.Int64(contentLength)
 	}
 
 	// Set Content-Type if available
@@ -69,10 +71,10 @@ func (t *TransitManager) uploadToS3(bucket, filePath, contentType string, conten
 }
 
 // ! logging,progress report
-func (t *TransitManager) TransferFromURL(url, bucketName, filePath string) error {
+func (t *TransitManager) Transfer() error {
 	var (
 		contentType         = ""
-		contentLenght int64 = 0
+		contentLength int64 = 0
 	)
 
 	/*
@@ -80,13 +82,13 @@ func (t *TransitManager) TransferFromURL(url, bucketName, filePath string) error
 	 */
 
 	// Get Download-Connection
-	resp, err := t.downloadFromURL(url)
+	resp, err := t.downloadFromURL(t.cfg.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("downloadFromURL: %s", err.Error())
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("invalid response status-code: %d", resp.StatusCode)
 	}
 
@@ -99,14 +101,16 @@ func (t *TransitManager) TransferFromURL(url, bucketName, filePath string) error
 
 	// Content-Lenght
 	if resp.ContentLength != 0 {
-		contentLenght = resp.ContentLength
+		contentLength = resp.ContentLength
 	}
 
-	return t.uploadToS3(
-		bucketName,
-		filePath,
+	err = t.uploadToS3(
+		t.cfg.Upload.Bucket,
+		t.cfg.Upload.FilePath,
 		contentType,
-		contentLenght,
+		contentLength,
 		resp.Body,
 	)
+
+	return err
 }
