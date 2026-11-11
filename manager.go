@@ -15,7 +15,7 @@ import (
 type TransitManager struct {
 	s3client   *s3.Client
 	httpclient *http.Client
-	cfg        *Config
+	cfg        Config
 	ctx        context.Context
 }
 
@@ -76,7 +76,7 @@ func New(ctx context.Context, cfg Config) (*TransitManager, error) {
 	var transferMngr = &TransitManager{
 		s3client:   s3client,
 		httpclient: httpclient,
-		cfg:        &cfg,
+		cfg:        cfg,
 		ctx:        ctx,
 	}
 
